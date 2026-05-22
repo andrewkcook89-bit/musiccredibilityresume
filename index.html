@@ -108,6 +108,31 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .favs-opt:hover{background:var(--bg3);color:var(--red2)}
 .favs-opt:last-child{border-bottom:none}
 .favs-wrap{position:relative}
+/* Release checklist */
+.rcl-wrap{border:1px solid var(--border2);background:var(--bg2);overflow:hidden;margin-top:4px}
+.rcl-header{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--bg3)}
+.rcl-progress{flex:1;height:6px;background:var(--border2);border-radius:0;overflow:hidden}
+.rcl-progress-bar{height:100%;background:var(--red);transition:width .2s}
+.rcl-pct{font-size:11px;font-weight:600;color:var(--red2);min-width:36px;text-align:right}
+.rcl-count{font-size:11px;color:var(--text3);white-space:nowrap}
+.rcl-filter{display:flex;gap:2px;padding:6px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.rcl-tab{font-size:11px;padding:2px 9px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;border-radius:0;transition:all .12s}
+.rcl-tab:hover{border-color:var(--red);color:var(--text2)}
+.rcl-tab.active{background:var(--red3);border-color:var(--red);color:#fff}
+.rcl-list{max-height:340px;overflow-y:auto}
+.rcl-row{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);transition:background .1s}
+.rcl-row:last-child{border-bottom:none}
+.rcl-row.checked{background:rgba(185,28,28,.07)}
+.rcl-row input[type=checkbox]{margin-top:3px;flex-shrink:0;accent-color:var(--red);width:14px;height:14px;cursor:pointer}
+.rcl-info{flex:1;min-width:0}
+.rcl-title{font-size:12px;font-weight:500;color:var(--text);line-height:1.3}
+.rcl-meta{font-size:11px;color:var(--text3);margin-top:1px}
+.rcl-notes-area{margin-top:5px}
+.rcl-notes-area textarea{width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);outline:none;resize:vertical;min-height:44px;border-radius:0;box-sizing:border-box}
+.rcl-actions{display:flex;gap:4px;flex-shrink:0;margin-top:1px}
+.rcl-btn{font-size:10px;padding:2px 7px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;border-radius:0;transition:all .12s;white-space:nowrap}
+.rcl-btn:hover{border-color:var(--red);color:var(--text2)}
+.rcl-btn.active{background:var(--bg3);border-color:var(--border2);color:var(--text2)}
 /* Paths */
 svg.pcv{width:100%;border:1px solid var(--border);background:var(--bg2);display:block}
 </style>
@@ -160,7 +185,7 @@ svg.pcv{width:100%;border:1px solid var(--border);background:var(--bg2);display:
     <button class="btn btn-p" onclick="OAF()">+ Add</button>
     <select onchange="favWaxFilter=this.value;RF()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;height:30px">
       <option value="all">All albums</option>
-      <option value="wax">On Wax only 🖤</option>
+      <option value="wax">On Wax only 💿</option>
       <option value="nowax">Not on Wax</option>
     </select>
   </div>
@@ -349,7 +374,7 @@ document.querySelectorAll('.tab').forEach(btn => {
 
 // - Modal -
 function SM(html) { $('MBOX').innerHTML = html; $('MODAL').classList.add('open'); }
-function CM() { $('MODAL').classList.remove('open'); $('MBOX').innerHTML = ''; pRels = []; rkSt = []; window._subruns = []; manualRks = []; relFilter = 'All'; }
+function CM() { $('MODAL').classList.remove('open'); $('MBOX').innerHTML = ''; pRels = []; rkSt = []; window._subruns = []; manualRks = []; rclFilter = 'All'; }
 
 // - Helpers -
 const fmt = d => { if (!d) return ''; try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}); } catch(e) { return d; } };
@@ -449,41 +474,101 @@ function RR() {
   }).join('') + '</tbody></table>';
 }
 
-// - Release picker -
-let pRels = [], rkSt = [], relFilter = 'All';
+// - Release checklist -
+let pRels = [], rkSt = [], rclFilter = 'All';
 
-function setRelFilter(f) {
-  relFilter = f;
-  document.querySelectorAll('.rel-tab').forEach(t => t.classList.toggle('active', t.dataset.f === f));
-  RLP('LR');
+function rclFilteredRels() {
+  if (rclFilter === 'All') return pRels;
+  return pRels.filter(r => (r.type||'LP') === rclFilter);
 }
 
-function relTabsHTML() {
-  const tabs = ['All','LP','EP','Single','MT','Other'];
-  return `<div class="rel-tabs">${tabs.map(f =>
-    `<button class="rel-tab${f===relFilter?' active':''}" data-f="${f}" onclick="setRelFilter('${f}')">${f}</button>`
-  ).join('')}</div>`;
+function rclProgress() {
+  const total = pRels.length;
+  const checked = pRels.filter(r => r._c).length;
+  const pct = total ? Math.round(checked / total * 100) : 0;
+  return { total, checked, pct };
+}
+
+function rclUpdateProgress() {
+  const bar = document.getElementById('rcl-bar');
+  const pctEl = document.getElementById('rcl-pct');
+  const countEl = document.getElementById('rcl-count');
+  const { total, checked, pct } = rclProgress();
+  if (bar) bar.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  if (countEl) countEl.textContent = checked + ' / ' + total;
+  // auto-set Run Completed when all checked
+  if (total > 0 && checked === total) {
+    document.querySelectorAll('[id^="src"]').forEach(sel => { if (sel.tagName === 'SELECT') sel.value = 'Yes'; });
+  }
 }
 
 function RLP(cid) {
   const el = $(cid); if (!el || !pRels.length) return;
-  const filtered = relFilter === 'All' ? pRels : pRels.filter(r => (r.type||'LP') === relFilter);
-  el.innerHTML = relTabsHTML() +
-    `<div class="hint" style="margin-bottom:4px">${filtered.length} release${filtered.length!==1?'s':''} shown (${pRels.length} total) — check what you listened to:</div>
-    <div class="rscr">` +
-    filtered.map(r => {
-      const i = pRels.indexOf(r);
-      return `<div class="rrow${r._c?' sel':''}" onclick="TP(${i},'${cid}')">
-        <input type="checkbox" ${r._c?'checked':''} onclick="event.stopPropagation();TP(${i},'${cid}')">
-        <div class="rri"><div class="rrt">${r.title}</div><div class="rrm">${r.year||''}${r.type?' · '+r.type:''}</div>
-        ${r._c?`<div class="rsub" onclick="event.stopPropagation()">
-          <input placeholder="Fav song..." value="${r._f||''}" oninput="pRels[${i}]._f=this.value">
-          <input placeholder="Notes..." value="${r._n||''}" oninput="pRels[${i}]._n=this.value">
-        </div>`:''}
-        </div><span class="tag">${r.type||'LP'}</span></div>`;
-    }).join('') + '</div>';
+  const tabs = ['All','LP','EP','MT','Single','Other'];
+  const filtered = rclFilteredRels();
+  const { total, checked, pct } = rclProgress();
+  el.innerHTML = `
+    <div class="rcl-wrap">
+      <div class="rcl-header">
+        <div class="rcl-progress"><div class="rcl-progress-bar" id="rcl-bar" style="width:${pct}%"></div></div>
+        <span class="rcl-pct" id="rcl-pct">${pct}%</span>
+        <span class="rcl-count" id="rcl-count">${checked} / ${total}</span>
+      </div>
+      <div class="rcl-filter">
+        ${tabs.map(f => `<button class="rcl-tab${f===rclFilter?' active':''}" onclick="rclSetFilter('${f}')">${f}</button>`).join('')}
+      </div>
+      <div class="rcl-list">
+        ${filtered.map(r => {
+          const i = pRels.indexOf(r);
+          const safeTitle = r.title.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/'/g,'&#39;');
+          return `<div class="rcl-row${r._c?' checked':''}" id="rcl-row-${i}">
+            <input type="checkbox" ${r._c?'checked':''} onchange="rclToggle(${i})">
+            <div class="rcl-info">
+              <div class="rcl-title">${r.title}</div>
+              <div class="rcl-meta">${r.year||''}${r.type?' · '+r.type:''}</div>
+              ${r._showNotes ? `<div class="rcl-notes-area">
+                <textarea placeholder="Notes…" oninput="pRels[${i}]._n=this.value">${r._n||''}</textarea>
+              </div>` : ''}
+            </div>
+            <div class="rcl-actions">
+              <button class="rcl-btn${r._showNotes?' active':''}" onclick="rclToggleNotes(${i})" title="Notes">+ Notes</button>
+              <button class="rcl-btn" onclick="rclRemove(${i})" title="Remove">✕</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
 }
-function TP(i,c) { if (!pRels[i]) return; pRels[i]._c = !pRels[i]._c; RLP(c); sRk(); renderRkP(); }
+
+function rclSetFilter(f) {
+  rclFilter = f;
+  RLP('LR');
+}
+
+function rclToggle(i) {
+  if (!pRels[i]) return;
+  pRels[i]._c = !pRels[i]._c;
+  // update just the row class and re-render progress without full re-render
+  const row = document.getElementById('rcl-row-' + i);
+  if (row) row.classList.toggle('checked', pRels[i]._c);
+  rclUpdateProgress();
+  sRk(); renderRkP();
+}
+
+function rclToggleNotes(i) {
+  if (!pRels[i]) return;
+  pRels[i]._showNotes = !pRels[i]._showNotes;
+  RLP('LR');
+}
+
+function rclRemove(i) {
+  pRels.splice(i, 1);
+  RLP('LR');
+  sRk(); renderRkP();
+}
+
+function TP(i,c) { rclToggle(i); }
 function gC() { return pRels.filter(r=>r._c).map(r=>({title:r.title,year:r.year,type:r.type||'LP',favSong:r._f||'',note:r._n||''})); }
 function sRk() {
   const ex = new Set(rkSt.map(r=>r.t.toLowerCase()));
@@ -491,30 +576,6 @@ function sRk() {
   const all = new Set(pRels.map(r=>r.title.toLowerCase()));
   rkSt = rkSt.filter(r => all.has(r.t.toLowerCase()));
 }
-function renderRkP() {
-  const el = $('RP'); if (!el) return;
-  if (!rkSt.length) { el.innerHTML = '<div class="hint" style="padding:8px 0">Look up the artist discography first, or add albums manually below.</div>'; return; }
-  const sorted = [...rkSt.filter(r=>r.c).sort((a,b)=>(a.rk||99)-(b.rk||99)), ...rkSt.filter(r=>!r.c)];
-  el.innerHTML = '<div class="hint">Check to include in ranking, then set order number (1 = best):</div><div style="border:1px solid var(--border);background:var(--bg2);overflow:hidden">' +
-    sorted.map(r => {
-      const i = rkSt.findIndex(x=>x.t===r.t);
-      return `<div class="rkp-row${r.c?' sel':''}" onclick="TRP(${i})">
-        <input type="checkbox" ${r.c?'checked':''} onclick="event.stopPropagation();TRP(${i})">
-        <span class="rkp-title">${r.t}</span>
-        <span class="rkp-meta">${r.y||''}${r.tp?' · '+r.tp:''}</span>
-        ${r.c?`<div class="rkp-num" onclick="event.stopPropagation()"><input type="number" value="${r.rk||''}" placeholder="#" min="1" oninput="rkSt[${i}].rk=+this.value||null;renderRkP()"></div>`:'<div class="rkp-num"></div>'}
-      </div>`;
-    }).join('') + '</div>';
-}
-function TRP(i) {
-  if (!rkSt[i]) return;
-  rkSt[i].c = !rkSt[i].c;
-  if (rkSt[i].c && !rkSt[i].rk) { const used = rkSt.filter(r=>r.c&&r.rk).map(r=>r.rk); let n=1; while(used.includes(n)) n++; rkSt[i].rk = n; }
-  if (!rkSt[i].c) rkSt[i].rk = null;
-  renderRkP();
-}
-function cRk() { return rkSt.filter(r=>r.c&&r.rk).map(r=>({id:uid(),rank:r.rk,lp:r.t,year:r.y})).sort((a,b)=>a.rank-b.rank); }
-
 // ── Fav Song autocomplete ─────────────────────────────────────────────
 let favSongCache = {}, favSongAll = [], _mbArtistId = null;
 
@@ -543,6 +604,11 @@ function showFavSongDropdown(inputEl, query) {
   if (!dd) { dd = document.createElement('div'); dd.className = 'favs-dropdown'; inputEl.parentNode.appendChild(dd); }
   const q = (query||'').toLowerCase();
   if (!q) { dd.style.display='none'; return; }
+  if (!favSongAll.length) {
+    dd.style.display='block';
+    dd.innerHTML = '<div class="favs-opt" style="color:var(--text3);font-style:italic;cursor:default">Click \u201cLook up \u2197\u201d first to enable song search</div>';
+    return;
+  }
   const matches = favSongAll.filter(r => r.title.toLowerCase().includes(q)).slice(0,20);
   if (!matches.length) { dd.style.display='none'; return; }
   dd.style.display = 'block';
@@ -606,7 +672,7 @@ function subrunHTML(i, sr) {
         <input id="srf${i}" class="favsong-inp"
           value="${(sr.favSong||'').replace(/"/g,'&quot;')}"
           data-sridx="${i}"
-          placeholder="Type to search songs…"
+          placeholder="Look up artist first, then type to search…"
           oninput="showFavSongDropdown(this,this.value)"
           onblur="hideFavDD(this)"
           autocomplete="off">
@@ -703,7 +769,7 @@ function runFormHTML(r) {
           <input id="li" value="${v.artist||''}" placeholder="Artist name…" onkeydown="if(event.key==='Enter')lookupArtistFull(this.value.trim())">
           <button class="btn" onclick="lookupArtistFull($('li').value.trim())">Look up ↗</button>
         </div>
-        <div id="LR">${e&&(v.releases||[]).length?`<div class="hint">${v.releases.length} releases logged — look up to refresh</div>`:''}</div>
+        <div id="LR">${e&&(v.releases||[]).length?`<div class="hint" style="color:var(--text2)">${v.releases.length} releases logged — click Look up to reload checklist, or save as-is</div>`:''}</div>
       </div>
       <div class="fr">
         <label>Genre <span style="color:var(--text3);font-weight:400;letter-spacing:0;text-transform:none;font-size:11px">(auto-fills on lookup)</span></label>
@@ -723,12 +789,12 @@ function runFormHTML(r) {
     <button class="btn btn-p" onclick="${e?`SER('${v.id}')`:' SNR()'}">${e?'Save':'Add run'}</button>
   </div>`;
 }
-function OAR() { pRels=[]; rkSt=[]; relFilter='All'; SM(runFormHTML(null)); renderSR(); }
+function OAR() { pRels=[]; rkSt=[]; rclFilter='All'; SM(runFormHTML(null)); renderSR(); }
 function OER(id) {
   const r = D.runs.find(x=>x.id===id); if (!r) return;
-  pRels = (r.releases||[]).map(x=>({...x,_c:true,_f:x.favSong||'',_n:x.note||''}));
+  pRels = (r.releases||[]).map(x=>({...x,_c:true,_f:x.favSong||'',_n:x.note||'',_showNotes:false}));
   rkSt = (r.releases||[]).map(x=>{const ex=(r.rankings||[]).find(k=>k.lp===x.title);return{t:x.title,y:x.year,tp:x.type,c:!!ex,rk:ex?.rank||null};});
-  relFilter='All';
+  rclFilter='All';
   SM(runFormHTML(r)); renderSR();
   if (pRels.length) RLP('LR');
 }
@@ -757,7 +823,7 @@ function reqD(artist) { lookupArtistFull(artist); }
 async function lookupArtistFull(artist) {
   const el = $('LR');
   if (!el || !artist) return;
-  relFilter = 'All';
+  rclFilter = 'All';
   el.innerHTML = `<div class="hint" style="color:var(--text2)"><span style="color:var(--red2)">●</span> Searching MusicBrainz for <strong>${artist}</strong>…</div>`;
   try {
     const res = await fetch(
@@ -822,7 +888,7 @@ async function fetchReleasesForMBID(mbid, artistName) {
         if (secondaryTypes.some(t => ['Compilation','Live','Remix','DJ-mix','Spokenword','Audiobook'].includes(t))) return null;
         return { title: rg.title, year: rg['first-release-date'] ? +rg['first-release-date'].slice(0,4) : null, type: typeMap[primaryType] || primaryType, mbid: rg.id };
       })
-      .filter(Boolean).filter(r => r.year).sort((a,b) => a.year - b.year);
+      .filter(Boolean).filter(r => r.year).filter(r => ['LP','EP','MT'].includes(r.type)).sort((a,b) => a.year - b.year);
     if (!releases.length) { el.innerHTML = `<div class="hint" style="color:var(--red2)">No studio releases found (compilations and live albums excluded).</div>`; return; }
     const ex = new Set(pRels.map(r => r.title.toLowerCase()));
     releases.filter(r => !ex.has(r.title.toLowerCase())).forEach(r => pRels.push({ ...r, _c:false, _f:'', _n:'' }));
@@ -1001,7 +1067,7 @@ function RF() {
     <td style="font-size:12px">${f.album}</td>
     <td style="color:var(--text3);font-size:11px;white-space:nowrap">${f.year||'—'}</td>
     <td>${f.genre?`<span class="badge b-genre">${f.genre}</span>`:'—'}</td>
-    <td style="text-align:center;font-size:14px">${f.ownOnWax?'🖤':'<span style="color:var(--text3);font-size:10px">—</span>'}</td>
+    <td style="text-align:center;font-size:14px">${f.ownOnWax?'💿':'<span style="color:var(--text3);font-size:10px">—</span>'}</td>
     <td style="font-size:11px;color:var(--text3);font-style:italic">${f.notes||'—'}</td>
     <td style="white-space:nowrap">
       <button class="btn btn-sm" onclick="EF('${f.id}')">Edit</button>
