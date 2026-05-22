@@ -549,11 +549,11 @@ function rclSetFilter(f) {
 function rclToggle(i) {
   if (!pRels[i]) return;
   pRels[i]._c = !pRels[i]._c;
-  // update just the row class and re-render progress without full re-render
   const row = document.getElementById('rcl-row-' + i);
   if (row) row.classList.toggle('checked', pRels[i]._c);
   rclUpdateProgress();
-  sRk(); renderRkP();
+  if (typeof sRk === 'function') sRk();
+  if (typeof renderRkP === 'function') renderRkP();
 }
 
 function rclToggleNotes(i) {
@@ -565,7 +565,8 @@ function rclToggleNotes(i) {
 function rclRemove(i) {
   pRels.splice(i, 1);
   RLP('LR');
-  sRk(); renderRkP();
+  if (typeof sRk === 'function') sRk();
+  if (typeof renderRkP === 'function') renderRkP();
 }
 
 function TP(i,c) { rclToggle(i); }
@@ -893,7 +894,7 @@ async function fetchReleasesForMBID(mbid, artistName) {
     const ex = new Set(pRels.map(r => r.title.toLowerCase()));
     releases.filter(r => !ex.has(r.title.toLowerCase())).forEach(r => pRels.push({ ...r, _c:false, _f:'', _n:'' }));
     RLP('LR');
-    sRk(); renderRkP();
+    if (typeof sRk === 'function') { sRk(); renderRkP(); }
     const lpCount=releases.filter(r=>r.type==='LP').length, epCount=releases.filter(r=>r.type==='EP').length, sCount=releases.filter(r=>r.type==='Single').length;
     const summary=[lpCount?`${lpCount} LP${lpCount!==1?'s':''}`:'' ,epCount?`${epCount} EP${epCount!==1?'s':''}`:'' ,sCount?`${sCount} single${sCount!==1?'s':''}`:'' ].filter(Boolean).join(', ');
     const existing = el.innerHTML;
